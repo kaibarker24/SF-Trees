@@ -1,6 +1,7 @@
 <html>
 <head>
     <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://d3js.org/topojson.v3.min.js"></script>
     <style>
         .gridlines line {
             stroke: #bbb;
@@ -9,123 +10,300 @@
         .gridlines .domain {
             stroke: none;
         }
+
+        .axis-label {
+            font-size: 12px;
+            fill: black;
+        }
+
+        .bar {
+            fill: #A8D08D;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 
 <body>
+    <div class="container">
+        <div>
+            <div class="title">Tree Planting in SF Over Time (Grouped by Decade)</div>
+            <svg id="chart1" width="1000" height="600"></svg>
+        </div>
 
-    <h2>Tree Planting in SF Over Time (Grouped by Decade)</h2>
-    <svg width="1000" height="600"></svg>
+        <div>
+            <div class="title">Tree Planting by Top 10 Neighborhoods</div>
+            <svg id="chart2" width="1000" height="600"></svg>
+        </div>
+    </div>
 
     <script>
-        const width = 1000, height = 600, margin = { top: 50, right: 50, bottom: 70, left: 70 };
+        const width = 1000, height = 600, margin = { top: 50, right: 150, bottom: 70, left: 70 };
 
-        const svg = d3.select("svg")
+        const svg1 = d3.select("#chart1")
                       .attr("width", width)
                       .attr("height", height);
 
         d3.csv("static/Street_Tree_List-2022-01-30_FILTERED.csv").then(data => {
+            data = data.filter(d => d.PlantDate !== "NA" && d.PlantDate != null);
 
-            data = data.filter(d => d.PlantDate !== "NA" && d.PlantDate != null);  
-
+            //get the decade by 10 year
             data.forEach(d => {
                 const cleanedDate = d.PlantDate.trim();
                 const dateObj = new Date(cleanedDate);
-                
                 if (!isNaN(dateObj)) {
                     const year = dateObj.getFullYear();
-                    const decade = Math.floor(year / 10) * 10;
-
-                    d.PlantYear = year;
-                    d.PlantDecade = decade;
+                    d.PlantDecade = Math.floor(year / 10) * 10;
                 } else {
                     d.PlantDecade = null;
                 }
             });
 
-            console.log("Filtered and parsed data: ", data);
-
+            //count
             const treeCountByDecade = {};
             data.forEach(d => {
                 if (d.PlantDecade) {
                     if (treeCountByDecade[d.PlantDecade]) {
-                        treeCountByDecade[d.PlantDecade] += 1; 
+                        treeCountByDecade[d.PlantDecade] += 1;
                     } else {
-                        treeCountByDecade[d.PlantDecade] = 1; 
+                        treeCountByDecade[d.PlantDecade] = 1;
                     }
                 }
             });
-
-            console.log("Tree count by decade: ", treeCountByDecade);
 
             const decades = [];
             for (let decade in treeCountByDecade) {
                 decades.push({ decade: +decade, count: treeCountByDecade[decade] });
             }
 
-            console.log("Decade data: ", decades);
-
-            const xScale = d3.scaleBand()
+            const xScale1 = d3.scaleBand()
                              .domain(decades.map(d => d.decade))
                              .range([margin.left, width - margin.right])
                              .padding(0.1);
 
-            const yScale = d3.scaleLinear()
+            const yScale1 = d3.scaleLinear()
                              .domain([0, d3.max(decades, d => d.count)])
                              .nice()
                              .range([height - margin.bottom, margin.top]);
 
-            const xAxis = d3.axisBottom(xScale);
-            svg.append("g")
-               .attr("transform", `translate(0,${height - margin.bottom})`)
-               .call(xAxis)
-               .append("text")
-               .attr("x", width / 2)
-               .attr("y", 40)
-               .attr("class", "axis-label")
-               .text("Decade")
-               .attr("fill", "black");
-
-            const yAxis = d3.axisLeft(yScale);
-            svg.append("g")
-               .attr("transform", `translate(${margin.left},0)`)
-               .call(yAxis)
-               .append("text")
-               .attr("x", -height / 2)
-               .attr("y", -50)
-               .attr("transform", "rotate(-90)")
-               .attr("class", "axis-label")
-               .text("Number of Trees Planted")
-               .attr("fill", "black");
-
-            svg.append("g")
+            svg1.append("g")
                .attr("class", "gridlines")
                .attr("transform", `translate(0,${height - margin.bottom})`)
-               .call(d3.axisBottom(xScale)
-                    .ticks(10)
-                    .tickSize(-height + margin.top + margin.bottom)
-                    .tickFormat(''));
+               .call(d3.axisBottom(xScale1).tickSize(-height + margin.top + margin.bottom).tickFormat(""));
 
-            svg.append("g")
+            svg1.append("g")
                .attr("class", "gridlines")
                .attr("transform", `translate(${margin.left},0)`)
-               .call(d3.axisLeft(yScale)
-                    .ticks(10)
-                    .tickSize(-width + margin.left + margin.right)
-                    .tickFormat(''));
+               .call(d3.axisLeft(yScale1).tickSize(-width + margin.left + margin.right).tickFormat(""));
 
-            svg.selectAll(".bar")
+            svg1.selectAll(".bar")
                .data(decades)
                .enter().append("rect")
                .attr("class", "bar")
-               .attr("x", d => xScale(d.decade))
-               .attr("y", d => yScale(d.count))
-               .attr("width", xScale.bandwidth())
-               .attr("height", d => height - margin.bottom - yScale(d.count))
+               .attr("x", d => xScale1(d.decade))
+               .attr("y", d => yScale1(d.count))
+               .attr("width", xScale1.bandwidth())
+               .attr("height", d => height - margin.bottom - yScale1(d.count))
                .attr("fill", "#A8D08D");
 
+            //https://www.geeksforgeeks.org/d3-js-axis-tickformat-function/
+
+            svg1.append("g")
+               .attr("transform", `translate(0,${height - margin.bottom})`)
+               .call(d3.axisBottom(xScale1).tickFormat(d => `${d}s`));
+
+            svg1.append("g")
+               .attr("transform", `translate(${margin.left},0)`)
+               .call(d3.axisLeft(yScale1));
+
+            svg1.append("text")
+               .attr("class", "axis-label")
+               .attr("transform", `translate(${width / 2},${height - margin.bottom + 40})`)
+               .style("text-anchor", "middle")
+               .text("Decade");
+
+            svg1.append("text")
+               .attr("class", "axis-label")
+               .attr("transform", "rotate(-90)")
+               .attr("y", 0 - margin.left)
+               .attr("x", 0 - (height / 2))
+               .style("text-anchor", "middle")
+               .text("Number of Trees Planted");
+        });
+
+        const svg2 = d3.select("#chart2")
+                        .attr("width", width)
+                        .attr("height", height);
+
+        d3.json("static/SF-Neighborhoods.geo.json").then(topology => {
+            const geoData = topojson.feature(topology, topology.objects.SFNeighborhoods);
+
+            d3.csv("static/Street_Tree_List-2022-01-30_FILTERED.csv").then(data => {
+                data = data.filter(d => d.PlantDate !== "NA" && d.PlantDate != null);
+
+                data.forEach(d => {
+                    d.latitude = +d.Latitude;
+                    d.longitude = +d.Longitude;
+
+                    // create decades by 10 years from the data -reuse
+                    const cleanedDate = d.PlantDate.trim();
+                    const dateObj = new Date(cleanedDate);
+                    if (!isNaN(dateObj)) {
+                        const year = dateObj.getFullYear();
+                        d.PlantDecade = Math.floor(year / 10) * 10;
+                    } else {
+                        d.PlantDecade = null;
+                    }
+                });
+                
+                // intersection code to see if lat/long falls in neighborhood
+                //https://stackoverflow.com/questions/217578/how-can-i-determine-whether-a-2d-point-is-within-a-polygon
+                function pointInPolygon(point, polygon) {
+                    const x = point[0]
+                    const y = point[1];
+                    let inside = false;
+                    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                        let xi = polygon[i][0], yi = polygon[i][1];
+                        let xj = polygon[j][0], yj = polygon[j][1];
+                        let intersect = ((yi > y) !== (yj > y)) &&
+                                        (x < ((xj - xi) * (y - yi) / (yj - yi) + xi));
+                        if (intersect) inside = !inside;
+                    }
+                    return inside;
+                }
+                
+                //checking if tree is in a specific neighborhood
+                data.forEach(tree => {
+                    const treePoint = [tree.longitude, tree.latitude];
+
+                    geoData.features.forEach(neighborhood => {
+                        const name = neighborhood.properties.name;
+                        const polygon = neighborhood.geometry.coordinates[0];
+
+                        if (pointInPolygon(treePoint, polygon)) {
+                            tree.Neighborhood = name;
+                        }
+                    });
+                });
+                
+                // d3 grouping documentation
+                const groupedData = d3.rollups(
+                    data.filter(d => d.PlantDecade), 
+                    v => v.length,
+                    d => d.PlantDecade,
+                    d => d.Neighborhood
+                );
+
+                const stackedData = [];
+                groupedData.forEach(([decade, neighborhoodData]) => {
+                    const decadeObj = { decade: +decade };
+                    neighborhoodData.forEach(([neighborhood, count]) => {
+                        decadeObj[neighborhood] = count;
+                    });
+                    stackedData.push(decadeObj);
+                });
+
+                // creating neighborhood stacked data for the top 10
+                // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set
+                // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/from
+                // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/keys
+                const allNeighborhoods = new Set();
+                stackedData.forEach(d => Object.keys(d).forEach(n => allNeighborhoods.add(n)));
+                allNeighborhoods.delete("decade");
+                const topNeighborhoods = Array.from(allNeighborhoods).slice(0, 10);
+
+                const stack = d3.stack().keys(topNeighborhoods).value((d, key) => d[key] || 0);
+                const series = stack(stackedData);
+                
+                //sort increasing order for 2nd graph and also find the top
+                const xScale2 = d3.scaleBand()
+                                .domain(stackedData.map(d => d.decade).sort((a, b) => a - b))
+                                .range([margin.left, width - margin.right])
+                                .padding(0.1);
+
+                const yScale2 = d3.scaleLinear()
+                                .domain([0, d3.max(series, s => d3.max(s, d => d[1]))])
+                                .range([height - margin.bottom, margin.top]);
+
+                const color = d3.scaleOrdinal(d3.schemeCategory10).domain(topNeighborhoods);
+
+                svg2.append("g")
+                .attr("class", "gridlines")
+                .attr("transform", `translate(0,${height - margin.bottom})`)
+                .call(d3.axisBottom(xScale2).tickSize(-height + margin.top + margin.bottom).tickFormat(""));
+
+                svg2.append("g")
+                .attr("class", "gridlines")
+                .attr("transform", `translate(${margin.left},0)`)
+                .call(d3.axisLeft(yScale2).tickSize(-width + margin.left + margin.right).tickFormat(""));
+
+                svg2.selectAll(".layer")
+                .data(series)
+                .enter().append("g")
+                .attr("class", "layer")
+                .attr("fill", d => color(d.key))
+                .selectAll("rect")
+                .data(d => d)
+                .enter().append("rect")
+                .attr("x", d => xScale2(d.data.decade))
+                .attr("y", d => yScale2(d[1]))
+                .attr("height", d => yScale2(d[0]) - yScale2(d[1]))
+                .attr("width", xScale2.bandwidth());
+
+                svg2.append("g")
+                .attr("transform", `translate(0,${height - margin.bottom})`)
+                .call(d3.axisBottom(xScale2).tickFormat(d => `${d}s`));
+
+                svg2.append("g")
+                .attr("transform", `translate(${margin.left},0)`)
+                .call(d3.axisLeft(yScale2));
+
+                svg2.append("text")
+                .attr("class", "axis-label")
+                .attr("transform", `translate(${width / 2},${height - margin.bottom + 40})`)
+                .style("text-anchor", "middle")
+                .text("Decade");
+
+                svg2.append("text")
+                .attr("class", "axis-label")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 0 - margin.left)
+                .attr("x", 0 - (height / 2))
+                .style("text-anchor", "middle")
+                .text("Number of Trees Planted");
+
+                const legend = svg2.append("g")
+                                    .attr("transform", `translate(${width - margin.right + 10}, ${margin.top})`);
+                
+                //stack by 20 pxs for legend
+                topNeighborhoods.forEach((neighborhood, i) => {
+                    const legendItem = legend.append("g")
+                                            .attr("transform", `translate(0, ${i * 20})`);
+
+                    legendItem.append("rect")
+                              .attr("width", 12)
+                              .attr("height", 12)
+                              .attr("fill", color(neighborhood));
+
+                    legendItem.append("text")
+                              .attr("x", 15)
+                              .attr("y", 10)
+                              .style("font-size", "12px")
+                              .text(neighborhood);
+                });
+            });
         });
     </script>
-    
 </body>
 </html>
